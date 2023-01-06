@@ -1406,62 +1406,146 @@ function EMS.GL.NextPlayerColor(_player)
 end
 
 function EMS.GL.RandomizeRules()
-	if not EMS.GL.GameStarted then
-		EMS.GL.TrySync("EMS.GL.CalculateRandomValues")
+	if EMS.GL.GameStarted then return end
+	if GUI.GetPlayerID() ~= EMS.GV.HostId then 
+		Message("Nur der Host kann diesen Button benutzen!")
+		Sound.PlayGUISound(Sounds.VoicesMentor_COMMENT_BadPlay_rnd_01)
+		return 
+	end
+	-- all checks passed, use XGUIEng.GetRandom(upperBound) to generate rules
+	EMS.GL.CustomRNG:Init()
+	local rng = function(_upperBound)
+		return EMS.GL.CustomRNG:GetRandomNumber(_upperBound)
+	end
+	-- just mimic the button callback
+	-- troop rules
+	EMS.GL.SetValue( "Sword", rng(5))
+	EMS.GL.SetValue( "PoleArm", rng(5))
+	EMS.GL.SetValue( "Bow", rng(5))
+	EMS.GL.SetValue( "Cannon1", rng(2))
+	EMS.GL.SetValue( "Cannon2", rng(2))
+	EMS.GL.SetValue( "Cannon3", rng(2))
+	EMS.GL.SetValue( "Cannon4", rng(2))
+	EMS.GL.SetValue( "HeavyCavalry", rng(3))
+	EMS.GL.SetValue( "LightCavalry", rng(3))
+	EMS.GL.SetValue( "Rifle", rng(3))
+	EMS.GL.SetValue( "Thief", rng(2))
+	EMS.GL.SetValue( "Scout", rng(2))
+	EMS.GL.SetValue( "Bridge", rng(3))
+	EMS.GL.SetValue( "TowerLevel", rng(4))
+	
+	-- heroes allowed
+	local heroes = {
+		"Dario",
+		"Ari",
+		"Erec",
+		"Salim",
+		"Pilgrim",
+		"Helias",
+		"Drake",
+		"Yuki",
+		"Kerberos",
+		"Mary_de_Mortfichet",
+		"Varg",
+		"Kala"
+	}
+	for i = 1,12,1 do
+			EMS.GL.SetValue( heroes[i], rng(2))
+	end
+	-- and hero count, this will be fun :)
+	if EMS.GL.Is16PlayerEnvironment() then
+		-- problem: heroes per player cannot be set for pId > 8 so just set the same count for all
+		EMS.GL.SetValue( "NumberOfHeroesForAll", rng(13))
+	else
+		-- now here we can do some chaos :D
+		for pId = 1, 8 do
+			if rng(40) == 0 then
+				EMS.GL.SetValue( "NumberOfHeroesForPlayer"..pId, 666) -- yes, this is stupid.
+			else
+				EMS.GL.SetValue( "NumberOfHeroesForPlayer"..pId, rng(13))
+			end
+		end
+	end
+	
+	
+	-- misc stuff
+	EMS.GL.SetValue( "MakeSummer", rng(2))
+	EMS.GL.SetValue( "MakeRain", rng(2))
+	EMS.GL.SetValue( "MakeSnow", rng(2))
+	EMS.GL.SetValue( "HQRush", rng(2)) -- was previously commented out, lame.
+	EMS.GL.SetValue( "BlessLimit", rng(2))
+	EMS.GL.SetValue( "AntiBug", rng(2)) -- was previously commented out, lame.
+	
+	-- weather timer
+	EMS.GL.SetValue( "WeatherChangeLockTimer", math.ceil(math.exp(EMS.GL.GetPoissonDistributedRealisation(40)/28)))
+	
+	-- peace time
+	EMS.GL.SetValue( "Peacetime", rng(49))
+	EMS.GL.SetValue( "TowerLimit", EMS.GL.GetPoissonDistributedRealisation(8))
+	if rng(2) == 1 then
+		EMS.GL.SetValue( "Markets", rng(15))
+		EMS.GL.SetValue( "TradeLimit", EMS.GL.GetPoissonDistributedRealisation(100)*25)
+	else
+		EMS.GL.SetValue( "Markets", -1)
 	end
 end
 
-function EMS.GL.CalculateRandomValues()
-	EMS.GL.SetValue("Sword",Logic.GetRandom(5))
-	EMS.GL.SetValue("PoleArm",Logic.GetRandom(5))
-	EMS.GL.SetValue("Bow",Logic.GetRandom(5))
-	EMS.GL.SetValue("Cannon1", Logic.GetRandom(2))
-	EMS.GL.SetValue("Cannon2", Logic.GetRandom(2))
-	EMS.GL.SetValue("Cannon3", Logic.GetRandom(2))
-	EMS.GL.SetValue("Cannon4", Logic.GetRandom(2))
-	EMS.GL.SetValue("HeavyCavalry",Logic.GetRandom(3))
-	EMS.GL.SetValue("LightCavalry",Logic.GetRandom(3))
-	EMS.GL.SetValue("Rifle",Logic.GetRandom(3))
-	EMS.GL.SetValue("Thief",Logic.GetRandom(2))
-	EMS.GL.SetValue("Scout",Logic.GetRandom(2))
-	EMS.GL.SetValue("Bridge",Logic.GetRandom(3))
-	EMS.GL.SetValue("TowerLevel",Logic.GetRandom(4))
-	local heroes = {
-    "Dario",
-    "Ari",
-    "Erec",
-    "Salim",
-    "Pilgrim",
-    "Helias",
-    "Drake",
-    "Yuki",
-    "Kerberos",
-    "Mary_de_Mortfichet",
-    "Varg",
-    "Kala"
-		}
-	for i = 1,12,1 do
-			EMS.GL.SetValue(heroes[i], Logic.GetRandom(2))
+-- returns true iff one of the positions 9 to 16 is used by a human player
+function EMS.GL.Is16PlayerEnvironment()
+	for pId = 9, 16 do
+		if XNetwork.GameInformation_IsHumanPlayerAttachedToPlayerID( pId ) == 1 then
+			return true
+		end
 	end
-	
-	EMS.GL.SetValue("NumberOfHeroesForAll", Logic.GetRandom(13))
-	EMS.GL.SetValue("Peacetime",Logic.GetRandom(61))
-	EMS.GL.SetValue("WeatherChangeLockTimer",Logic.GetRandom(11))
-	--EMS.GL.SetValue("TradeLimit", math.floor(Logic.GetRandom(100001)/250)*250)
-	EMS.GL.SetValue("TowerLimit",Logic.GetRandom(61))
-	EMS.GL.SetValue("MakeSummer", Logic.GetRandom(2))
-	EMS.GL.SetValue("MakeRain", Logic.GetRandom(2))
-	EMS.GL.SetValue("MakeSnow", Logic.GetRandom(2))
-	--EMS.GL.SetValue("HQRush", Logic.GetRandom(2))
-	EMS.GL.SetValue("BlessLimit", Logic.GetRandom(2))
-	--EMS.GL.SetValue("AntiBug", Logic.GetRandom(2))
-	
-	if Logic.GetRandom(2) == 1 then
-		EMS.GL.SetValue("Markets",0)
-		EMS.GL.SetValue("Markets",Logic.GetRandom(101))
-	else
-		EMS.GL.SetValue("Markets",-1)
+	return false
+end
+
+-- for time stuff use different distributions
+-- returns a single realisation of a random variable X where for any k \in \N_0:
+--	P(X == k) = e^{-\lambda} \lambda^k / k!
+function EMS.GL.GetPoissonDistributedRealisation( _lambda) -- this thing is insanely bugged rn
+	-- do a lot of chained decisions 
+	-- upper limit that hopefully will never be reached
+	local upperLimit = 1000
+	local k = 0
+	local expLambda = math.exp(-_lambda)
+	-- prepare some variables that will be helpful later on
+	local probLeqk = 0 -- P(X <= k)
+	local probEqk = 0 -- P(X == k)
+	local kFaculty = 1 -- k!
+	local kPotency = 1 -- lambda^k
+	while k < upperLimit do
+		probEqk = expLambda * kPotency / kFaculty
+		probLeqk = probLeqk + probEqk
+		-- argument to the biased coin is P(X == k | X >= k)
+		-- if this coin is successful then return k
+		if EMS.GL.GetBiasedCoinRealisation( probEqk / (1-probLeqk + probEqk)) then 
+			return k
+		else -- else increment k and update kFaculty and kPotency
+			k = k + 1
+			kFaculty = k*kFaculty
+			kPotency = _lambda * kPotency
+		end
 	end
+	return upperLimit
+end
+
+function EMS.GL.GetBiasedCoinRealisation( _prob)
+	local multiplier = 100000
+	return EMS.GL.CustomRNG:GetRandomNumber(multiplier) <= _prob*multiplier
+end
+
+EMS.GL.CustomRNG = {}
+EMS.GL.CustomRNG.Prime = 684713 -- prime that will be used by the generator
+EMS.GL.CustomRNG.CurrVal = 1 -- this one is actually illegal
+function EMS.GL.CustomRNG:Init()
+	EMS.GL.CustomRNG.Seed = XGUIEng.GetRandom(self.Prime)
+end
+function EMS.GL.CustomRNG:GetRandomNumber( _upperBound)
+	-- first update the currVal
+	self.CurrVal = math.ceil(math.mod(self.CurrVal * self.Seed, self.Prime)) -- this should never hit 0
+	if self.CurrVal == 0 then self.CurrVal = 1 end -- account for numerical instabilities
+	return math.mod(self.CurrVal, _upperBound)
 end
 
 
