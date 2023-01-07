@@ -1115,6 +1115,15 @@ function EMS.GL.StartRequestYes()
 	XGUIEng.ShowWidget("EMSPUSCNo", 0);
 	EMS.GL.ToggleMainMenu();
 	
+	local startDelay = 2
+	if Logic.GetTime() < startDelay then -- things look bad
+		Sound.PlayGUISound( Sounds.VoicesMentor_MP_TauntNo, 100)
+		Message("Das Spiel kann nicht zu Sekunde 0 gestartet werden.")
+		Message("Wartet noch "..(startDelay-Logic.GetTime()).." Sekunden!") -- TODO: Make these things look less ugly
+		XGUIEng.ShowWidget("EMSPUSCRequest", 1)
+		return
+	end
+	
 	Sync.Call("EMS.GL.InitiateStart");
 	if EMS.UseCNetwork then -- TODO: refactor Sync.Call, so sync call works as a substitute.
 		Sync.Call("EMS.GL.SetRulesByConfig", Sync.TableToString(EMS.RD.GetRuleConfig()));
