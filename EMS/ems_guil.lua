@@ -1459,7 +1459,7 @@ function EMS.GL.RandomizeRules()
 		"Kala"
 	}
 	for i = 1,12,1 do
-			EMS.GL.SetValue( heroes[i], rng(2))
+		EMS.GL.SetValue( heroes[i], rng(2))
 	end
 	-- and hero count, this will be fun :)
 	if EMS.GL.Is16PlayerEnvironment() then
@@ -1468,11 +1468,7 @@ function EMS.GL.RandomizeRules()
 	else
 		-- now here we can do some chaos :D
 		for pId = 1, 8 do
-			if rng(40) == 0 then
-				EMS.GL.SetValue( "NumberOfHeroesForPlayer"..pId, 666) -- yes, this is stupid.
-			else
-				EMS.GL.SetValue( "NumberOfHeroesForPlayer"..pId, rng(13))
-			end
+			EMS.GL.SetValue( "NumberOfHeroesForPlayer"..pId, rng(13))
 		end
 	end
 	
@@ -1486,16 +1482,24 @@ function EMS.GL.RandomizeRules()
 	EMS.GL.SetValue( "AntiBug", rng(2)) -- was previously commented out, lame.
 	
 	-- weather timer
-	EMS.GL.SetValue( "WeatherChangeLockTimer", math.ceil(math.exp(EMS.GL.GetPoissonDistributedRealisation(40)/28)))
+	EMS.GL.SetValue( "WeatherChangeLockTimer", math.max( 1, EMS.GL.GetPoissonDistributedRealisation(13) - 8))
 	
 	-- peace time
 	EMS.GL.SetValue( "Peacetime", rng(49))
-	EMS.GL.SetValue( "TowerLimit", EMS.GL.GetPoissonDistributedRealisation(8))
+	EMS.GL.SetValue( "TowerLimit", math.ceil(math.exp(EMS.GL.GetPoissonDistributedRealisation(100)/10 - 8.2)) )
 	if rng(2) == 1 then
 		EMS.GL.SetValue( "Markets", rng(15))
-		EMS.GL.SetValue( "TradeLimit", EMS.GL.GetPoissonDistributedRealisation(100)*25)
+		EMS.GL.SetValue( "TradeLimit", math.max( 0, EMS.GL.GetPoissonDistributedRealisation(100)*250 - 20000))
 	else
 		EMS.GL.SetValue( "Markets", -1)
+	end
+	local ressourceLevelRng = rng(10)
+	if ressourceLevelRng < 6 then
+		EMS.GL.SetValue( "ResourceLevel", 1)
+	elseif ressourceLevelRng < 9 then
+		EMS.GL.SetValue( "ResourceLevel", 2)
+	else
+		EMS.GL.SetValue( "ResourceLevel", 3)
 	end
 end
 
@@ -1539,24 +1543,63 @@ function EMS.GL.GetPoissonDistributedRealisation( _lambda) -- this thing is insa
 	return upperLimit
 end
 
+-- Just to check whether the poisson distributed RVs work as intended
+function EMS.GL.TestPoissonDistribution(_numTests, _lambda)
+	local realisations = {}
+	for j = 1, _numTests do
+		realisations[j] = EMS.GL.GetPoissonDistributedRealisation( _lambda)
+	end
+	-- compute the mean
+	local mean = 0
+	for j = 1, _numTests do
+		mean = mean + realisations[j]
+	end
+	mean = mean / _numTests
+	LuaDebugger.Log("Mean: "..mean)
+	-- compute variance
+	local var = 0
+	for j = 1, _numTests do
+		var = var + (realisations[j]-mean)*(realisations[j]-mean)
+	end
+	var = var / _numTests
+	LuaDebugger.Log("Variance: "..var)
+	
+end
+
+
 function EMS.GL.GetBiasedCoinRealisation( _prob)
-	local multiplier = 100000
+	local multiplier = 1000
 	return EMS.GL.CustomRNG:GetRandomNumber(multiplier) <= _prob*multiplier
 end
 
 EMS.GL.CustomRNG = {}
 EMS.GL.CustomRNG.Prime = 684713 -- prime that will be used by the generator
 EMS.GL.CustomRNG.CurrVal = 1 -- this one is actually illegal
+EMS.GL.CustomRNG.LCGMultiplier = 75
+EMS.GL.CustomRNG.LCGAdditive = 74
+EMS.GL.CustomRNG.LCGModulus = 65537 -- 2^16 + 1
+EMS.GL.CustomRNG.USE_LCG_FLAG = true
 function EMS.GL.CustomRNG:Init()
 	EMS.GL.CustomRNG.Seed = XGUIEng.GetRandom(self.Prime)
+	EMS.GL.CustomRNG.SeedLCG = XGUIEng.GetRandom(self.LCGModulus)
 end
 function EMS.GL.CustomRNG:GetRandomNumber( _upperBound)
+	-- if the flag is active then use the linear congruential generator
+	if self.USE_LCG_FLAG then
+		local rawVal = self:GetRandomNumberLCG()
+		return math.mod(rawVal, _upperBound)
+	end
+	-- else use the custom prime one
 	-- first update the currVal
 	self.CurrVal = math.ceil(math.mod(self.CurrVal * self.Seed, self.Prime)) -- this should never hit 0
 	if self.CurrVal == 0 then self.CurrVal = 1 end -- account for numerical instabilities
 	return math.mod(self.CurrVal, _upperBound)
 end
-
+function EMS.GL.CustomRNG:GetRandomNumberLCG()
+	local newVal = self.LCGMultiplier * self.SeedLCG + self.LCGAdditive
+	self.SeedLCG = math.mod(newVal, self.LCGModulus)
+	return self.SeedLCG
+end
 
 
 
